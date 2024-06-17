@@ -1,13 +1,32 @@
 import AndroKGE_utils
 import AndroKGE_APK_processing
 import logging
-
+import AndroKGE_feature_processing
 #configuration
 
 
 APK_DIRECTORY = "../data/apks2"         # Path to the directory where APK files are stored
 N_WORKERS = 8                           # Number of worker processes for feature extraction
 API_KEY = "../Azoo.key"                 # API key for AndroZoo
+
+
+FEATURES_DIRECTORY = "../data/features"  # Path to the directory where the features will be stored
+
+
+
+DATASET_GRAPH = "../data/dataset_graph.txt"  # Path to the txt file where the dataset graph will be stored
+GRAPH_DELIMITER = "~_~_~"                    # Delimiter for the dataset graph
+DATASET_FEATURES = "../data/dataset_features.csv"  # Path to the CSV file where the dataset features will be stored
+    # if "" then not saved
+
+
+IND_GRAPHS_DIRECTORY = "../data/ind_graphs"      # Path to the directory where the graphs will be stored
+ING_FEATURES_DIRECTORY = "../data/ind_features"  # Path to the directory where the features will be stored
+    # if "" then not saved
+
+
+
+
 
 def main():
 
@@ -28,7 +47,12 @@ def main():
 
     # STEP 03 - will be taken from older project - APK_feature_processing.py - will be used to create the graph structures - should receive configuration on the top level, so it can be easily changed
 
+    processor = AndroKGE_feature_processing.FeatureProcessor(FEATURES_DIRECTORY, DATASET_GRAPH, DATASET_FEATURES, GRAPH_DELIMITER, IND_GRAPHS_DIRECTORY, ING_FEATURES_DIRECTORY)
+    processor.create_graph()
+
     # STEP 04 - embedding training - again configuration should be unified and results stored in Json structure. Configuration at the top level, so users can change it.
+
+
 
     # STEP 05 - feature vectors + PCA - taken from previous project - and it should be easily configurable
 

@@ -5,6 +5,10 @@
       <excludeFolder url="file://$MODULE_DIR$/data/apks" />
       <excludeFolder url="file://$MODULE_DIR$/data/apks2" />
       <excludeFolder url="file://$MODULE_DIR$/data/features" />
+      <excludeFolder url="file://$MODULE_DIR$/data/benign" />
+      <excludeFolder url="file://$MODULE_DIR$/data/ind_features" />
+      <excludeFolder url="file://$MODULE_DIR$/data/ind_graphs" />
+      <excludeFolder url="file://$MODULE_DIR$/data/malware" />
     </content>
     <orderEntry type="jdk" jdkName="AndroKGE" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

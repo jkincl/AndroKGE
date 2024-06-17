@@ -1,210 +1,201 @@
 import os
 import shutil
-
-import APK_utils
+import AndroKGE_utils
 import networkx as nx
 
+# Configuration:
+# Features to be processed from the JSON object separated into two feature groups
+# Depends on the keys available in the JSON object provided by decompilation container
+
+APK_FEATURES = ["Opcodes", "API calls", "API packages", "System commands"]      # Strings ommited - optional choice
+APK_ActSerRec = ["Activities", "Services", "Receivers"]                         # Features to be processed
 
 
-
-
-def process_features(directory_path, pth_to_edgelist="", pth_to_feat_list="", delimiter="~_~_~", ind_g_save_dir="", ind_f_save_dir=""):
+class FeatureProcessor:
     """
-       Generate a graph from features stored in JSON files within the specified directory or directories,
-       and extract and store the features as CSV files.
+    Processes application features from JSON files to construct network graphs representing the relationships
+    and dependencies among the features.
 
-       Parameters:
-           directory_path (str or list):
-               Path to the directory or a list of directories containing the JSON files.
-           pth_to_edgelist (str):
-               Optional. Path to save the generated graph as an edgelist file.
-           pth_to_feat_list (str):
-               Optional. Path to save the generated feature list as a CSV file.
-           delimiter (str):
-               Optional. Delimiter to use when saving the graph as an edgelist file.
-           ind_g_save_dir (str):
-               Optional. Path to the directory where individual app graphs will be saved as edgelist files.
-           ind_f_save_dir (str):
-               Optional. Path to the directory where individual feature lists will be saved as CSV files.
+    This class supports the construction of both a comprehensive graph including all processed features
+    and individual graphs for each application's features. It also handles the storage of these graphs
+    and their corresponding feature lists in specified directories.
 
-       Returns:
-           networkx.Graph:
-               The generated graph.
+    Attributes:
+        extracted_features (str): Directory where extracted features are stored.
+        dataset_graph (str): Path where the full dataset graph should be saved.
+        dataset_features (str): Path where the full dataset features should be saved.
+        delimiter (str): Delimiter used for storing graphs in text format.
+        ind_g_save_dir (str): Directory to save individual graphs.
+        ind_f_save_dir (str): Directory to save individual feature lists.
+        Graph (nx.Graph): NetworkX graph object to hold the comprehensive graph of all features.
+        feature_list (list): List to store all feature nodes added to the Graph.
 
-       Note:
-           - If `pth_to_edgelist` is provided, the graph will be saved as an edgelist file at the specified path
-             using the specified delimiter.
-           - If `pth_to_feat_list` is provided, the feature list will be saved as a CSV file at the specified path.
-           - If `ind_g_save_dir` is provided, individual app graphs will be saved as edgelist files in the specified directory.
-           - If `ind_f_save_dir` is provided, individual feature lists will be saved as CSV files in the specified directory.
-       """
-
-    # ==============local function declaration==================
-    def crawl_and_sort_features(graph, feature_list, json):
+    Methods:
+        prepare_directories(): Ensures that output directories are available and clean for storing graphs and features.
+        add_features(): Adds a feature to the comprehensive and individual graphs and records it in the respective lists.
+        crawl_and_sort_features(): Processes and categorizes features from JSON, updating graph structures.
+        get_graph(): Returns the comprehensive graph constructed from all processed features.
+        create_graph(): Initiates the processing of feature files to construct and save graphs and feature lists.
+    """
+    def __init__(self, features_directory, dataset_graph, dataset_features, graph_delimiter, ind_graphs_directory,
+                 ind_features_directory):
         """
-            Extract and process features from a JSON object and add them to a given graph.
+                    Initializes the feature processor with all necessary paths and configurations.
 
-            Parameters:
-                graph (networkx.Graph):
-                    The graph to which the features will be added.
-                feature_list (list):
-                    The list to which the features will be appended.
-                json (dict):
-                    The JSON object containing the features.
+                    Args:
+                        features_directory (str): Directory where extracted features are stored.
+                        dataset_graph (str): Path where the full dataset graph should be saved.
+                        dataset_features (str): Path where the full dataset features should be saved.
+                        graph_delimiter (str): Delimiter used for storing graphs in text format.
+                        ind_graphs_directory (str): Directory to save individual graphs.
+                        ind_features_directory (str): Directory to save individual feature lists.
+        """
 
-            Returns:
-                tuple:
-                    A tuple containing the updated graph, the updated feature list, the individual app graph with the added features,
-                    the individual feature list, and the root node value.
-                    - The first graph contains all the features from processed applications.
-                    - The feature list contains all the features appended during processing.
-                    - The second graph represents the features of the individual app extracted from the JSON object.
-                    - The individual feature list contains the features extracted from the JSON object.
-                    - The root node of the individual app graph is provided in the tuple for future reference.
-            """
+        self.extracted_features = features_directory
+        self.dataset_graph = dataset_graph
+        self.dataset_features = dataset_features
+        self.delimiter = graph_delimiter
+        self.ind_g_save_dir = ind_graphs_directory
+        self.ind_f_save_dir = ind_features_directory
+        self.Graph = nx.Graph()
+        self.feature_list = []
 
-        # Create a new graph to store individual JSON values and an individual list
+    def prepare_directories(self):
+        """
+               Prepares directories for saving individual graph and feature files, ensuring they are clean and ready for new data.
+        """
+
+        # Clear and create the directory for individual graphs
+        if self.ind_g_save_dir and not os.path.exists(self.ind_g_save_dir):
+            shutil.rmtree(self.ind_g_save_dir, ignore_errors=True)
+            os.makedirs(self.ind_g_save_dir, exist_ok=True)
+
+        # Clear and create the directory for individual features
+        if self.ind_f_save_dir and not os.path.exists(self.ind_f_save_dir):
+            shutil.rmtree(self.ind_f_save_dir, ignore_errors=True)
+            os.makedirs(self.ind_f_save_dir, exist_ok=True)
+
+    @staticmethod
+    def add_features(graph, individual_graph, feature_list, individual_feat_list, root_node, value):
+        """
+         Adds features to both the main and individual graphs, and records them in the respective feature lists.
+
+         Args:
+             graph (nx.Graph): The main graph being constructed for all data.
+             individual_graph (nx.Graph): Graph specific to the current JSON object being processed.
+             feature_list (list): List of features added to the main graph.
+             individual_feat_list (list): List of features specific to the individual graph.
+             root_node (str): The root node identifier in the graph.
+             value (str): Feature value to add to the graph and lists.
+
+         """
+
+        graph.add_edge(value, root_node)
+        individual_graph.add_edge(value, root_node)
+        feature_list.append(value)
+        individual_feat_list.append(value)
+        return
+
+    def crawl_and_sort_features(self, graph, application_features, feature_list):
+        """
+                Processes application features from JSON and updates the graph structures accordingly.
+
+                Args:
+                    graph (nx.Graph): The main graph to which features will be added.
+                    application_features (dict): Parsed JSON structure containing all the features.
+                    feature_list (list): List to store all the feature nodes added to the graph.
+
+                Returns:
+                    tuple: Contains the individual graph, feature list for this graph, and root node identifier.
+        """
+
+        # variables for storing individual graph and feature list, per analysed application
         individual_graph = nx.Graph()
         individual_feat_list = []
 
-        for fl_key in json.keys():
-            if fl_key == "Pre_static_analysis":
-                # Set the root node representing the APK to be HASH SHA256
-                root_node = str(json[fl_key]["sha256"])
+        root_node = None
 
+        # Process each feature category from the JSON object
+        for first_level_key in application_features.keys():
+            if first_level_key == "Pre_static_analysis":
+                # Set the root node representing the APK to be HASH SHA256
+                root_node = str(application_features[first_level_key]["sha256"])
                 graph.add_node(root_node)
                 individual_graph.add_node(root_node)
-                # ROOT node values are IGNORED as features for feature lists
 
                 # Add the SHA1 hash as a feature subnode to the root node
-                sha1_hash = str(json[fl_key]["sha1"])
-
-                graph.add_edge(sha1_hash, root_node)
-                individual_graph.add_edge(sha1_hash, root_node)
-
-                feature_list.append(sha1_hash)
-                individual_feat_list.append(sha1_hash)
+                sha1_hash = str(application_features[first_level_key]["sha1"])
+                self.add_features(graph, individual_graph, feature_list, individual_feat_list, root_node, sha1_hash)
 
             else:
-                if fl_key == "Static_analysis":
+                if first_level_key == "Static_analysis":
+
                     # Package name node
-                    package_name = str(json[fl_key]["Package name"])
-
-                    graph.add_edge(package_name, root_node)
-                    individual_graph.add_edge(package_name, root_node)
-
-                    feature_list.append(package_name)
-                    individual_feat_list.append(package_name)
+                    package_name = str(application_features[first_level_key]["Package name"])
+                    self.add_features(graph, individual_graph, feature_list, individual_feat_list, root_node,
+                                      package_name)
 
                     # Main activity node stripped of package name
-                    main_activity = str(json[fl_key]["Main activity"]).split(".")[-1]
-
-                    graph.add_edge(main_activity, root_node)
-                    individual_graph.add_edge(main_activity, root_node)
-
-                    feature_list.append(main_activity)
-                    individual_feat_list.append(main_activity)
+                    main_activity = str(application_features[first_level_key]["Main activity"]).split(".")[-1]
+                    self.add_features(graph, individual_graph, feature_list, individual_feat_list, root_node,
+                                      main_activity)
 
                     # Add permissions as edges to the root node
-                    for permission in json[fl_key]["Permissions"]:
+                    for permission in application_features[first_level_key]["Permissions"]:
                         permission = str(permission)
+                        self.add_features(graph, individual_graph, feature_list, individual_feat_list, root_node,
+                                          permission)
 
-                        graph.add_edge(permission, root_node)
-                        individual_graph.add_edge(permission, root_node)
-
-                        feature_list.append(permission)
-                        individual_feat_list.append(permission)
-
-                    # Iterate over various keys for different features
-                        #Strings REMOVED - optional choice
-                    for sl_key in ["Opcodes", "API calls", "API packages", "System commands"]:
-                        if sl_key == "Strings":
+                    # Iterate over various application feature elements defined in the configuration of this file to add them into the graph as nodes.
+                    for second_level_key in APK_FEATURES:
+                        if second_level_key == "Strings":
                             prep = "STR-"
                         else:
                             prep = ""
-                        for key in json[fl_key][sl_key].keys():
+                        for key in application_features[first_level_key][second_level_key].keys():
                             key = prep + str(key)
+                            self.add_features(graph, individual_graph, feature_list, individual_feat_list, root_node,
+                                              key)
 
-                            graph.add_edge(key, root_node)
-                            individual_graph.add_edge(key, root_node)
+                    # Iterate over application activities, services, and receivers to add them into the graph as nodes.
+                    for second_level_key in APK_ActSerRec:
+                        for third_level_key in application_features[first_level_key][second_level_key].keys():
+                            if application_features[first_level_key][second_level_key][third_level_key]:
+                                third_level_key = str(third_level_key)
+                                self.add_features(graph, individual_graph, feature_list, individual_feat_list,
+                                                  root_node, third_level_key)
 
-                            feature_list.append(key)
-                            individual_feat_list.append(key)
+        return individual_graph, individual_feat_list, root_node
 
-                    # Add activities, services, and receivers as edges to the root node
-                    for sl_key in ["Activities", "Services", "Receivers"]:
-                        for tl_key in json[fl_key][sl_key].keys():
-                            if json[fl_key][sl_key][tl_key] != []:
-                                tl_key = str(tl_key)
+    def get_graph(self):
+        """
+        Returns the main graph constructed from all processed features.
+        """
+        return self.Graph
 
-                                graph.add_edge(tl_key, root_node)
-                                individual_graph.add_edge(tl_key, root_node)
+    def create_graph(self):
+        """
+        Main method to process all feature files and construct graphs based on them.
+        """
+        #TODO: Add tests for this method?
+        self.prepare_directories()
 
-                                feature_list.append(tl_key)
-                                individual_feat_list.append(tl_key)
+        # Initiate the processing of all feature files from the output directory of APK decompiling container
+        for feature_file in os.listdir():
+            file_path = os.path.join(self.extracted_features, feature_file)
+            features_json = AndroKGE_utils.JSONHandler.load_json(file_path)
 
-                                # Add intents as edges to their corresponding activities, services, and receivers
-                                for value in json[fl_key][sl_key][tl_key]:
-                                    if "android.intent.action.MAIN" not in value:
-                                        value = str(value)
+            ind_graph, ind_feat_list, apk_hash = self.crawl_and_sort_features(features_json)
 
-                                        graph.add_edge(value, tl_key)
-                                        individual_graph.add_edge(value, tl_key)
+            # Optionally save individual graph and feature list
+            if self.ind_g_save_dir:
+                nx.write_edgelist(ind_graph, os.path.join(self.ind_g_save_dir, f"{apk_hash}"), delimiter=self.delimiter)
+            if self.ind_f_save_dir:
+                AndroKGE_utils.CSVHandler.save_list_as_csv(ind_feat_list,
+                                                           os.path.join(self.ind_f_save_dir, f"{apk_hash}.csv"))
 
-                                        feature_list.append(value)
-                                        individual_feat_list.append(value)
-
-        return graph, feature_list, individual_graph, individual_feat_list, root_node
-    # ==============end of local function declaration==================
-
-    # ==============function source code==============
-
-    # Check if directory_path is a string or a list
-    if isinstance(directory_path, str):
-        directory_path = [directory_path]
-
-    elif isinstance(directory_path, list):
-        for i in directory_path:
-            if not isinstance(i, str):
-                print("Unknown parameter type. The parameter must be a string or a list of strings.")
-                return
-    elif not isinstance(directory_path, list):
-        print("Unknown parameter type. The parameter must be a string or a list of strings.")
-        return
-
-    # Create an empty graph and empty feature list
-    G = nx.Graph()
-    feature_list = []
-
-    # Remove previous content from specified directories!
-    if ind_g_save_dir != "":
-        if os.path.exists(ind_g_save_dir):
-            shutil.rmtree(ind_g_save_dir)
-        os.mkdir(ind_g_save_dir)
-    if ind_f_save_dir != "":
-        if os.path.exists(ind_f_save_dir):
-            shutil.rmtree(ind_f_save_dir)
-        os.mkdir(ind_f_save_dir)
-
-    # Traverse through each directory and file to process the JSON files
-    for directory in directory_path:
-        for file in os.listdir(directory):
-            processed_json = APK_utils.load_json(directory + "/" + file)
-            G, feature_list, ind_graph, ind_feat_list, HASH = crawl_and_sort_features(G,feature_list, processed_json)
-
-            # Save individual app graphs if ind_save_dir is provided
-            if ind_g_save_dir != "":
-                nx.write_edgelist(ind_graph, ind_g_save_dir + "/" + HASH, delimiter=delimiter)
-            if ind_f_save_dir != "":
-                ind_feat_list= APK_utils.get_unique_sorted_list(ind_feat_list)
-                APK_utils.save_list_as_csv(ind_feat_list,ind_f_save_dir + "/" + HASH + ".csv")
-
-    # Save the main graph as an edgelist file if pth_to_edgelist is provided
-    if pth_to_edgelist != "":
-        nx.write_edgelist(G, pth_to_edgelist, delimiter=delimiter)
-    if pth_to_feat_list != "":
-        feature_list = APK_utils.get_unique_sorted_list(feature_list)
-        APK_utils.save_list_as_csv(feature_list, pth_to_feat_list)
-    else:
-        # Return the generated graph
-        return G
+        # If the paths for the Graph and Feature files are provided, save them
+        if self.dataset_graph:
+            nx.write_edgelist(self.Graph, self.dataset_graph, delimiter=self.delimiter)
+        if self.dataset_features:
+            AndroKGE_utils.CSVHandler.save_list_as_csv(self.feature_list, self.dataset_features)
